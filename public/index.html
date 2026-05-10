@@ -108,7 +108,6 @@
     .social-icon:hover { background: rgba(255,255,255,0.2); }
     footer { text-align: center; color: #6a7db0; font-size: 0.8rem; opacity: 0.8; margin-top: 1rem; }
     
-    /* ألوان الحالات */
     .status-pending { color: #ffd700; }
     .status-approved { color: #00ff88; }
     .status-rejected { color: #ff4444; }
@@ -126,7 +125,6 @@
     <p class="subtitle">أرسل رسالة إلى نفسك في المستقبل</p>
   </div>
 
-  <!-- القسم 1: إنشاء الكبسولة -->
   <div class="glass-card">
     <div class="section-header">
       <i class="fas fa-paper-plane"></i>
@@ -151,7 +149,6 @@
     </button>
   </div>
 
-  <!-- القسم 2: كيف تعمل -->
   <div class="glass-card">
     <div class="section-header">
       <i class="fas fa-lightbulb"></i>
@@ -165,7 +162,6 @@
     </div>
   </div>
 
-  <!-- القسم 3: الكبسولات المخزنة -->
   <div class="glass-card">
     <div class="section-header">
       <i class="fas fa-archive"></i>
@@ -176,7 +172,6 @@
     </div>
   </div>
 
-  <!-- القسم 4: اللغات -->
   <div class="glass-card">
     <div class="section-header"><i class="fas fa-globe"></i><h2>🌐 لغة التطبيق (100+ لغة)</h2></div>
     <select class="lang-select" id="languageSelect" onchange="changeLanguage(this.value)">
@@ -191,7 +186,6 @@
     </select>
   </div>
 
-  <!-- القسم 5: تواصل معنا -->
   <div class="glass-card">
     <div class="section-header"><i class="fas fa-headset"></i><h2>📞 تواصل مع المطور</h2></div>
     <div class="contact-content">
@@ -262,7 +256,7 @@
       const capsules = await res.json();
 
       if (!capsules || !capsules.length) {
-        capsulesContainer.innerHTML = '<div style="text-align:center;color:#7f8bb3;padding:1.5rem;">✨ لا توجد كبسولات بعد. كن أول من يختم واحدة!</div>';
+        capsulesContainer.innerHTML = '<div style="text-align:center;color:#7f8bb3;padding:1.5rem;">✨ لا توجد كبسولات بعد.</div>';
         return;
       }
 

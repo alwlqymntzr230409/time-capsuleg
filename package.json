@@ -1,13 +1,12 @@
 {
   "name": "time-capsule",
   "version": "1.0.0",
-  "description": "Time Capsule with Telegram Bot",
+  "description": "Time Capsule - Send messages to the future",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "node-fetch": "^2.6.7"
+    "express": "^4.18.2"
   }
 }

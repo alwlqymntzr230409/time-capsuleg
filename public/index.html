@@ -108,9 +108,7 @@
     .social-icon:hover { background: rgba(255,255,255,0.2); }
     footer { text-align: center; color: #6a7db0; font-size: 0.8rem; opacity: 0.8; margin-top: 1rem; }
     
-    .status-pending { color: #ffd700; }
     .status-approved { color: #00ff88; }
-    .status-rejected { color: #ff4444; }
     .status-sent { color: #4da6ff; }
     
     @media (max-width: 600px) { .glass-card { padding: 1.5rem; } }
@@ -200,12 +198,13 @@
     </div>
   </div>
 
-  <footer><p>© 2026 The Time Capsule · جميع الحقوق محفوظة · يعمل 24 ساعة عبر Google</p></footer>
+  <footer><p>© 2026 The Time Capsule · يعمل 24 ساعة عبر Google Apps Script</p></footer>
 </div>
 
 <script>
-  // ==================== رابط Google Apps Script ====================
+  // ==================== الرابط الصحيح لـ Google Apps Script ====================
   const API_URL = "https://script.google.com/macros/s/AKfycbwJREEkM7TCH1y9ZGvtkAGJzQ5dnCWwMAdzg42mmEMB5pjAhMyX8TPdwo6_39YPATzL/exec";
+
   const messageInput = document.getElementById('messageInput');
   const unlockDateInput = document.getElementById('unlockDateInput');
   const emailInput = document.getElementById('emailInput');
@@ -233,7 +232,7 @@
     if (new Date(unlockDate) <= new Date()) return alert("اختر تاريخاً في المستقبل");
 
     try {
-      await fetch(API_URL, {
+      const response = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -244,12 +243,18 @@
           status: "approved"
         })
       });
-
-      messageInput.value = '';
-      emailInput.value = '';
-      setDefaultDate();
-      loadCapsules();
-      alert("✅ تم ختم الكبسولة! سيرفر Google سيرسلها تلقائياً في الموعد.");
+      
+      const result = await response.json();
+      
+      if (result.status === "success") {
+        messageInput.value = '';
+        emailInput.value = '';
+        setDefaultDate();
+        loadCapsules();
+        alert("✅ تم ختم الكبسولة! سيرفر Google سيرسلها تلقائياً.");
+      } else {
+        alert("❌ خطأ: " + (result.message || "فشل الحفظ"));
+      }
     } catch (err) {
       alert("❌ خطأ في حفظ الكبسولة. تأكد من اتصالك بالإنترنت.");
     }
@@ -310,7 +315,7 @@
         `;
       }).join('');
     } catch (err) {
-      capsulesContainer.innerHTML = '<div style="text-align:center;color:#ff9999;">❌ خطأ في تحميل الكبسولات</div>';
+      capsulesContainer.innerHTML = '<div style="text-align:center;color:#ff9999;">❌ خطأ في تحميل الكبسولات. تأكد من الرابط.</div>';
     }
   }
 

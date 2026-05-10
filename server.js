@@ -30,14 +30,18 @@ app.post('/api/capsules', async (req, res) => {
     email,
     message,
     unlockDate: new Date(unlockDate).toISOString(),
-    status: 'pending', // pending, approved, rejected, sent
+    status: 'pending',
     createdAt: new Date().toISOString()
   };
   
   capsules.push(capsule);
   
   // إرسال إشعار للبوت
-  await sendTelegramNotification(capsule);
+  try {
+    await sendTelegramNotification(capsule);
+  } catch (err) {
+    console.error('خطأ في إرسال إشعار تيليجرام:', err.message);
+  }
   
   res.json({ status: 'success', capsuleId, message: 'تم إرسال الكبسولة للمراجعة' });
 });
@@ -55,7 +59,7 @@ app.get('/api/capsules', (req, res) => {
   res.json(result);
 });
 
-// ==================== Webhook لاستقبال ردود البوت ====================
+// ==================== Webhook تيليجرام ====================
 app.post('/api/telegram-webhook', (req, res) => {
   const { callback_query } = req.body;
   
@@ -63,8 +67,6 @@ app.post('/api/telegram-webhook', (req, res) => {
     const data = callback_query.data;
     const msg = callback_query.message;
     const chatId = msg.chat.id;
-    
-    // تنسيق: action_capsuleId
     const [action, capsuleId] = data.split('_');
     
     const capsule = capsules.find(c => c.id === capsuleId);
@@ -77,11 +79,11 @@ app.post('/api/telegram-webhook', (req, res) => {
     if (action === 'approve') {
       capsule.status = 'approved';
       editMessageToApproved(chatId, msg.message_id, capsule);
-      answerCallback(chatId, callback_query.id, '✅ تم قبول الكبسولة');
+      answerCallback(chatId, callback_query.id, '✅ تم قبول الكبسولة - ستصل في موعدها');
     } else if (action === 'reject') {
       capsule.status = 'rejected';
       editMessageToRejected(chatId, msg.message_id, capsule);
-      answerCallback(chatId, callback_query.id, '❌ تم رفض الكبسولة');
+      answerCallback(chatId, callback_query.id, '❌ تم رفض الرسالة للأسف');
     }
   }
   
@@ -95,14 +97,13 @@ async function sendTelegramNotification(capsule) {
     hour: '2-digit', minute: '2-digit'
   });
   
-  const text = `📬 **كبسولة زمنية جديدة**
+  const text = `📬 كبسولة زمنية جديدة
 
-👤 **البريد:** \`${capsule.email}\`
-📝 **الرسالة:** ${capsule.message.length > 100 ? capsule.message.slice(0, 100) + '...' : capsule.message}
-📅 **موعد الفتح:** ${unlockDate}
-⏰ **أُرسلت الآن**
+👤 البريد: ${capsule.email}
+📝 الرسالة: ${capsule.message.length > 100 ? capsule.message.slice(0, 100) + '...' : capsule.message}
+📅 موعد الفتح: ${unlockDate}
 
-⚖️ **اختر:**`;
+⚖️ اختر:`;
 
   const keyboard = {
     inline_keyboard: [
@@ -119,18 +120,17 @@ async function sendTelegramNotification(capsule) {
     body: JSON.stringify({
       chat_id: CHAT_ID,
       text: text,
-      parse_mode: 'Markdown',
       reply_markup: keyboard
     })
   });
 }
 
 function editMessageToApproved(chatId, messageId, capsule) {
-  const text = `📬 **كبسولة زمنية - تم القبول ✅**
+  const text = `📬 كبسولة زمنية - تم القبول ✅
 
-👤 **البريد:** \`${capsule.email}\`
-📅 **موعد الفتح:** ${new Date(capsule.unlockDate).toLocaleString('ar-SA')}
-📌 **الحالة:** ⏳ في الانتظار`;
+👤 البريد: ${capsule.email}
+📅 موعد الفتح: ${new Date(capsule.unlockDate).toLocaleString('ar-SA')}
+📌 الحالة: ⏳ في الانتظار - ستصل في موعدها`;
 
   fetch(`${TELEGRAM_API}/editMessageText`, {
     method: 'POST',
@@ -138,17 +138,16 @@ function editMessageToApproved(chatId, messageId, capsule) {
     body: JSON.stringify({
       chat_id: chatId,
       message_id: messageId,
-      text: text,
-      parse_mode: 'Markdown'
+      text: text
     })
-  });
+  }).catch(err => console.error('خطأ في تعديل الرسالة:', err.message));
 }
 
 function editMessageToRejected(chatId, messageId, capsule) {
-  const text = `📬 **كبسولة زمنية - تم الرفض ❌**
+  const text = `📬 كبسولة زمنية - تم الرفض ❌
 
-👤 **البريد:** \`${capsule.email}\`
-📌 **الحالة:** 🚫 لقد تم رفض الرسالة للأسف`;
+👤 البريد: ${capsule.email}
+📌 الحالة: 🚫 لقد تم رفض الرسالة للأسف`;
 
   fetch(`${TELEGRAM_API}/editMessageText`, {
     method: 'POST',
@@ -156,10 +155,9 @@ function editMessageToRejected(chatId, messageId, capsule) {
     body: JSON.stringify({
       chat_id: chatId,
       message_id: messageId,
-      text: text,
-      parse_mode: 'Markdown'
+      text: text
     })
-  });
+  }).catch(err => console.error('خطأ في تعديل الرسالة:', err.message));
 }
 
 function answerCallback(chatId, callbackId, text) {
@@ -171,16 +169,17 @@ function answerCallback(chatId, callbackId, text) {
       text: text,
       show_alert: false
     })
-  });
+  }).catch(err => console.error('خطأ في الرد:', err.message));
 }
 
 // ==================== فحص الكبسولات وإرسالها ====================
 function checkAndSend() {
   const now = new Date();
+  console.log(`🔍 فحص ${capsules.length} كبسولة - ${now.toLocaleString('ar-SA')}`);
   
   capsules.forEach(c => {
     if (c.status === 'approved' && new Date(c.unlockDate) <= now && !sentCapsules.has(c.id)) {
-      console.log('🚀 إرسال كبسولة:', c.email);
+      console.log(`🚀 جاري إرسال الكبسولة إلى: ${c.email}`);
       
       fetch(EMAILJS_URL, {
         method: 'POST',
@@ -198,8 +197,9 @@ function checkAndSend() {
       })
       .then(res => res.text())
       .then(text => {
+        console.log(`📩 رد EmailJS: ${text}`);
         if (text === 'OK') {
-          console.log('✅ تم الإرسال:', c.email);
+          console.log(`✅ تم إرسال الإيميل بنجاح إلى: ${c.email}`);
           sentCapsules.add(c.id);
           c.status = 'sent';
           
@@ -209,21 +209,24 @@ function checkAndSend() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               chat_id: CHAT_ID,
-              text: `✅ **تم إرسال الكبسولة**\n📧 إلى: \`${c.email}\`\n📅 في: ${new Date().toLocaleString('ar-SA')}`,
-              parse_mode: 'Markdown'
+              text: `✅ تم إرسال الكبسولة\n📧 إلى: ${c.email}\n📅 في: ${new Date().toLocaleString('ar-SA')}`
             })
-          });
+          }).catch(err => console.error('خطأ إشعار الإرسال:', err.message));
+        } else {
+          console.error(`❌ فشل الإرسال. الرد: ${text}`);
         }
       })
-      .catch(err => console.error('❌ خطأ:', err.message));
+      .catch(err => console.error(`❌ خطأ اتصال: ${err.message}`));
     }
   });
 }
 
+// فحص كل 10 ثواني
 setInterval(checkAndSend, 10000);
 
 // ==================== تشغيل السيرفر ====================
 app.listen(PORT, () => {
-  console.log(`🚀 Time Capsule server على المنفذ ${PORT}`);
+  console.log(`🚀 Time Capsule server يعمل على المنفذ ${PORT}`);
   console.log(`🤖 بوت تيليجرام مفعل`);
+  console.log(`📬 فحص الكبسولات كل 10 ثواني`);
 });

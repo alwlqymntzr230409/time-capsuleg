@@ -250,6 +250,68 @@
     }
   });
 
+  function getStatusInfo(c) {
+    const now = Date.now();
+    const unlock = new Date(c.unlockDate).getTime();
+    const dist = unlock - now;
+    const isPast = dist <= 0;
+
+    // إذا السيرفر أرسلها فعلاً (status = sent)
+    if (c.status === 'sent') {
+      return {
+        statusText: '✅ تم القبول والإرسال',
+        statusClass: 'status-sent',
+        countdownText: '📬 تم الإرسال بنجاح'
+      };
+    }
+    
+    // إذا تم رفضها
+    if (c.status === 'rejected') {
+      return {
+        statusText: '🔴 تم رفض الرسالة للأسف',
+        statusClass: 'status-rejected',
+        countdownText: '🚫 مرفوضة'
+      };
+    }
+    
+    // إذا تم قبولها وانتهى الوقت - يظهر "جاري الإرسال" مرة واحدة فقط
+    if (c.status === 'approved' && isPast) {
+      return {
+        statusText: '🟢 لقد تم قبول الرسالة - جاري إرسالها',
+        statusClass: 'status-approved',
+        countdownText: '📧 جاري الإرسال...'
+      };
+    }
+    
+    // إذا تم قبولها ولسه الوقت ما جاء
+    if (c.status === 'approved' && !isPast) {
+      const d = Math.floor(dist / 86400000);
+      const h = Math.floor((dist % 86400000) / 3600000);
+      const m = Math.floor((dist % 3600000) / 60000);
+      return {
+        statusText: '🟢 لقد تم قبول الرسالة ستصل في موعدها',
+        statusClass: 'status-approved',
+        countdownText: `⏳ ${d}ي ${h}س ${m}د`
+      };
+    }
+    
+    // إذا بانتظار القبول
+    if (c.status === 'pending') {
+      return {
+        statusText: '🟡 بانتظار القبول من تيليجرام',
+        statusClass: 'status-pending',
+        countdownText: '⏳ انتظار المراجعة'
+      };
+    }
+    
+    // افتراضي
+    return {
+      statusText: c.status,
+      statusClass: '',
+      countdownText: '...'
+    };
+  }
+
   async function loadCapsules() {
     try {
       const res = await fetch(API_URL);
@@ -261,55 +323,16 @@
       }
 
       capsulesContainer.innerHTML = capsules.map(c => {
-        const now = Date.now();
-        const unlock = new Date(c.unlockDate).getTime();
-        const dist = unlock - now;
-
-        let statusText = '';
-        let statusClass = '';
-        let countdownText = '';
-
-        switch (c.status) {
-          case 'pending':
-            statusText = '🟡 بانتظار القبول من تيليجرام';
-            statusClass = 'status-pending';
-            countdownText = '⏳ انتظار المراجعة';
-            break;
-            
-          case 'approved':
-            statusText = '🟢 لقد تم قبول الرسالة ستصل في موعدها';
-            statusClass = 'status-approved';
-            if (dist <= 0) {
-              countdownText = '📧 جاري الإرسال...';
-            } else {
-              const d = Math.floor(dist / 86400000);
-              const h = Math.floor((dist % 86400000) / 3600000);
-              const m = Math.floor((dist % 3600000) / 60000);
-              countdownText = `⏳ ${d}ي ${h}س ${m}د`;
-            }
-            break;
-            
-          case 'rejected':
-            statusText = '🔴 تم رفض الرسالة للأسف';
-            statusClass = 'status-rejected';
-            countdownText = '🚫 مرفوضة';
-            break;
-            
-          case 'sent':
-            statusText = '✅ تم القبول والإرسال';
-            statusClass = 'status-sent';
-            countdownText = '📬 تم الإرسال بنجاح';
-            break;
-        }
+        const info = getStatusInfo(c);
 
         return `
           <div class="capsule-item">
             <div style="flex:1;">
               <small>📧 ${escapeHtml(c.email)}</small><br>
               <small style="color:#9aa9e0;">🔐 ${new Date(c.unlockDate).toLocaleString('ar-SA')}</small><br>
-              <small class="${statusClass}" style="font-weight:bold;">${statusText}</small>
+              <small class="${info.statusClass}" style="font-weight:bold;">${info.statusText}</small>
             </div>
-            <div class="countdown">${countdownText}</div>
+            <div class="countdown">${info.countdownText}</div>
           </div>
         `;
       }).join('');

@@ -200,11 +200,12 @@
     </div>
   </div>
 
-  <footer><p>© 2026 The Time Capsule · جميع الحقوق محفوظة</p></footer>
+  <footer><p>© 2026 The Time Capsule · جميع الحقوق محفوظة · يعمل 24 ساعة عبر Google</p></footer>
 </div>
 
 <script>
-  const API_URL = "/api/capsules";
+  // ==================== رابط Google Apps Script ====================
+  const API_URL = "https://script.google.com/macros/s/AKfycbwezUZrFGQUEL8pR0cUpjdM9jzxaQk6XnITgy_Luut-7TbQEVQHWqVwTjwWVllfWv9L/exec";
 
   const messageInput = document.getElementById('messageInput');
   const unlockDateInput = document.getElementById('unlockDateInput');
@@ -233,84 +234,27 @@
     if (new Date(unlockDate) <= new Date()) return alert("اختر تاريخاً في المستقبل");
 
     try {
-      const res = await fetch(API_URL, {
+      await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, message, unlockDate: new Date(unlockDate).toISOString() })
+        body: JSON.stringify({
+          id: Date.now().toString(),
+          email: email,
+          message: message,
+          unlockDate: new Date(unlockDate).toISOString(),
+          status: "approved"
+        })
       });
 
-      const data = await res.json();
       messageInput.value = '';
       emailInput.value = '';
       setDefaultDate();
       loadCapsules();
-      alert("✅ " + data.message);
+      alert("✅ تم ختم الكبسولة! سيرفر Google سيرسلها تلقائياً في الموعد.");
     } catch (err) {
-      alert("❌ خطأ في حفظ الكبسولة");
+      alert("❌ خطأ في حفظ الكبسولة. تأكد من اتصالك بالإنترنت.");
     }
   });
-
-  function getStatusInfo(c) {
-    const now = Date.now();
-    const unlock = new Date(c.unlockDate).getTime();
-    const dist = unlock - now;
-    const isPast = dist <= 0;
-
-    // إذا السيرفر أرسلها فعلاً (status = sent)
-    if (c.status === 'sent') {
-      return {
-        statusText: '✅ تم القبول والإرسال',
-        statusClass: 'status-sent',
-        countdownText: '📬 تم الإرسال بنجاح'
-      };
-    }
-    
-    // إذا تم رفضها
-    if (c.status === 'rejected') {
-      return {
-        statusText: '🔴 تم رفض الرسالة للأسف',
-        statusClass: 'status-rejected',
-        countdownText: '🚫 مرفوضة'
-      };
-    }
-    
-    // إذا تم قبولها وانتهى الوقت - يظهر "جاري الإرسال" مرة واحدة فقط
-    if (c.status === 'approved' && isPast) {
-      return {
-        statusText: '🟢 لقد تم قبول الرسالة - جاري إرسالها',
-        statusClass: 'status-approved',
-        countdownText: '📧 جاري الإرسال...'
-      };
-    }
-    
-    // إذا تم قبولها ولسه الوقت ما جاء
-    if (c.status === 'approved' && !isPast) {
-      const d = Math.floor(dist / 86400000);
-      const h = Math.floor((dist % 86400000) / 3600000);
-      const m = Math.floor((dist % 3600000) / 60000);
-      return {
-        statusText: '🟢 لقد تم قبول الرسالة ستصل في موعدها',
-        statusClass: 'status-approved',
-        countdownText: `⏳ ${d}ي ${h}س ${m}د`
-      };
-    }
-    
-    // إذا بانتظار القبول
-    if (c.status === 'pending') {
-      return {
-        statusText: '🟡 بانتظار القبول من تيليجرام',
-        statusClass: 'status-pending',
-        countdownText: '⏳ انتظار المراجعة'
-      };
-    }
-    
-    // افتراضي
-    return {
-      statusText: c.status,
-      statusClass: '',
-      countdownText: '...'
-    };
-  }
 
   async function loadCapsules() {
     try {
@@ -322,17 +266,47 @@
         return;
       }
 
+      const now = Date.now();
+
       capsulesContainer.innerHTML = capsules.map(c => {
-        const info = getStatusInfo(c);
+        const unlock = new Date(c.unlockDate).getTime();
+        const dist = unlock - now;
+
+        let statusText = '', statusClass = '', countdownText = '';
+
+        if (c.status === 'sent') {
+          statusText = '✅ تم الإرسال بنجاح';
+          statusClass = 'status-sent';
+          countdownText = '📬 أُرسلت';
+        } else if (c.status === 'approved' && dist <= 0) {
+          statusText = '🔄 جاري التجهيز للإرسال...';
+          statusClass = 'status-approved';
+          countdownText = '⏳ بانتظار Google';
+        } else if (c.status === 'approved' && dist > 0) {
+          const d = Math.floor(dist / 86400000);
+          const h = Math.floor((dist % 86400000) / 3600000);
+          const m = Math.floor((dist % 3600000) / 60000);
+          statusText = '🟢 مخزنة وفي انتظار الموعد';
+          statusClass = 'status-approved';
+          countdownText = `${d}ي ${h}س ${m}د`;
+        } else if (c.status === 'pending') {
+          statusText = '🟡 بانتظار المراجعة';
+          statusClass = 'status-pending';
+          countdownText = '⏳ انتظار';
+        } else if (c.status === 'rejected') {
+          statusText = '🔴 تم الرفض';
+          statusClass = 'status-rejected';
+          countdownText = '🚫 مرفوضة';
+        }
 
         return `
           <div class="capsule-item">
             <div style="flex:1;">
               <small>📧 ${escapeHtml(c.email)}</small><br>
               <small style="color:#9aa9e0;">🔐 ${new Date(c.unlockDate).toLocaleString('ar-SA')}</small><br>
-              <small class="${info.statusClass}" style="font-weight:bold;">${info.statusText}</small>
+              <small class="${statusClass}" style="font-weight:bold;">${statusText}</small>
             </div>
-            <div class="countdown">${info.countdownText}</div>
+            <div class="countdown">${countdownText}</div>
           </div>
         `;
       }).join('');
@@ -365,7 +339,7 @@
   }
 
   loadCapsules();
-  setInterval(loadCapsules, 5000);
+  setInterval(loadCapsules, 10000);
 </script>
 </body>
 </html>

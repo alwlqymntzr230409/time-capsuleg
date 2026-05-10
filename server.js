@@ -9,13 +9,12 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // إعدادات EmailJS الخاصة بك
 const EMAILJS_URL = "https://api.emailjs.com/api/v1.0/email/send";
-const PUBLIC_KEY = "yMWdxIn35VlreN0l_"; // حسابك
-const SERVICE_ID = "service_zo9ni5b";   // خدمتك
-const TEMPLATE_ID = "template_y1f36sr"; // قالبك
+const PUBLIC_KEY = "yMWdxIn35VlreN0l_";
+const SERVICE_ID = "service_zo9ni5b";
+const TEMPLATE_ID = "template_y1f36sr";
 
 let capsules = [];
 
-// استقبال كبسولة جديدة من الواجهة
 app.post('/api/capsules', (req, res) => {
   const { email, message, unlockDate } = req.body;
   capsules.push({
@@ -24,21 +23,21 @@ app.post('/api/capsules', (req, res) => {
     unlockDate: new Date(unlockDate),
     status: 'locked'
   });
-  console.log('✅ كبسولة جديدة:', email);
+  console.log('✅ كبسولة جديدة:', email, 'فتح في:', unlockDate);
   res.json({ status: 'success' });
 });
 
-// عرض الكبسولات المخزنة
 app.get('/api/capsules', (req, res) => {
   res.json(capsules);
 });
 
-// فحص الكبسولات كل 30 ثانية وإرسال الإيميلات تلقائياً
 function checkCapsules() {
   const now = new Date();
+  console.log(`🔍 [${now.toLocaleString('ar-SA')}] فحص ${capsules.length} كبسولة...`);
+  
   capsules.forEach((c, index) => {
     if (c.unlockDate <= now && c.status === 'locked') {
-      console.log('🚀 إرسال كبسولة إلى:', c.email);
+      console.log('🚀 محاولة إرسال الكبسولة إلى:', c.email);
       
       fetch(EMAILJS_URL, {
         method: 'POST',
@@ -54,22 +53,22 @@ function checkCapsules() {
           }
         })
       })
-      .then(response => {
-        if (response.ok) {
+      .then(response => response.text())
+      .then(text => {
+        console.log('📩 رد EmailJS:', text);
+        if (text === 'OK') {
           console.log('✅ تم إرسال الإيميل بنجاح إلى:', c.email);
           c.status = 'sent';
         } else {
-          console.error('❌ فشل الإرسال:', response.status);
+          console.error('❌ فشل إرسال الإيميل. الرد:', text);
         }
-        return response.text();
       })
-      .then(text => console.log('📩 رد EmailJS:', text))
-      .catch(err => console.error('❌ خطأ في الاتصال:', err));
+      .catch(err => console.error('❌ خطأ في الاتصال بـ EmailJS:', err.message));
     }
   });
 }
 
-// تشغيل الفحص كل 30 ثانية
+// فحص كل 30 ثانية
 setInterval(checkCapsules, 30000);
 
 app.listen(PORT, () => {

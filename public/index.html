@@ -259,17 +259,18 @@ sealButton.addEventListener('click', async () => {
   if (new Date(unlockDate) <= new Date()) return alert("اختر تاريخاً في المستقبل");
 
   try {
-    await fetch(API_URL, {
+    const res = await fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, message, unlockDate: new Date(unlockDate).toISOString() })
     });
 
+    const data = await res.json();
     messageInput.value = '';
     emailInput.value = '';
     setDefaultDate();
     loadCapsules();
-    alert("✅ تم ختم الكبسولة! السيرفر سيرسلها تلقائياً في الموعد.");
+    alert("✅ تم إرسال الكبسولة للمراجعة. سيصلك إشعار في تيليجرام.");
   } catch (err) {
     alert("❌ خطأ في حفظ الكبسولة");
   }
@@ -290,23 +291,41 @@ async function loadCapsules() {
       const unlock = new Date(c.unlockDate).getTime();
       const dist = unlock - now;
 
+      let statusText = '';
       let countdownText = '';
-      if (c.status === 'sent') {
-        countdownText = '✅ أُرسلت';
-      } else if (dist <= 0) {
-        countdownText = '🔓 جاري الإرسال...';
-      } else {
-        const d = Math.floor(dist / 86400000);
-        const h = Math.floor((dist % 86400000) / 3600000);
-        const m = Math.floor((dist % 3600000) / 60000);
-        countdownText = `${d}ي ${h}س ${m}د`;
+
+      switch (c.status) {
+        case 'pending':
+          statusText = '🟡 بانتظار القبول';
+          countdownText = '⏳ انتظار';
+          break;
+        case 'approved':
+          statusText = '🟢 تم القبول';
+          if (dist <= 0) {
+            countdownText = '🔓 جاري الإرسال...';
+          } else {
+            const d = Math.floor(dist / 86400000);
+            const h = Math.floor((dist % 86400000) / 3600000);
+            const m = Math.floor((dist % 3600000) / 60000);
+            countdownText = `${d}ي ${h}س ${m}د`;
+          }
+          break;
+        case 'rejected':
+          statusText = '🔴 تم الرفض';
+          countdownText = '🚫 للأسف';
+          break;
+        case 'sent':
+          statusText = '✅ تم الإرسال';
+          countdownText = '📧 أُرسلت';
+          break;
       }
 
       return `
         <div class="capsule-item">
           <div>
             <small>📧 ${escapeHtml(c.email)}</small><br>
-            <small style="color:#9aa9e0;">🔐 ${new Date(c.unlockDate).toLocaleString('ar-SA')}</small>
+            <small style="color:#9aa9e0;">🔐 ${new Date(c.unlockDate).toLocaleString('ar-SA')}</small><br>
+            <small>${statusText}</small>
           </div>
           <div class="countdown">${countdownText}</div>
         </div>
@@ -319,6 +338,25 @@ async function loadCapsules() {
 
 function escapeHtml(text) {
   return String(text).replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+}
+
+function changeLanguage(lang) {
+  if (!document.getElementById('google_translate_element')) {
+    const div = document.createElement('div');
+    div.id = 'google_translate_element';
+    div.style.display = 'none';
+    document.body.appendChild(div);
+  }
+  const script = document.createElement('script');
+  script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateInit';
+  document.body.appendChild(script);
+  window.googleTranslateInit = function() {
+    new google.translate.TranslateElement({
+      pageLanguage: 'ar',
+      includedLanguages: lang,
+      layout: google.translate.TranslateElement.InlineLayout.SIMPLE
+    }, 'google_translate_element');
+  };
 }
 
 loadCapsules();

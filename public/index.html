@@ -11,24 +11,18 @@
       background: radial-gradient(ellipse at 30% 10%, #0b0c1a 0%, #030514 100%);
       font-family: 'Tajawal', 'Segoe UI', sans-serif;
       min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 1.5rem 1rem;
-      color: #e8eef2;
-      position: relative;
-      overflow-x: hidden;
+      display: flex; flex-direction: column; align-items: center;
+      padding: 1.5rem 1rem; color: #e8eef2;
+      position: relative; overflow-x: hidden;
     }
     body::before {
-      content: "";
-      position: fixed; top: 0; left: 0;
+      content: ""; position: fixed; top: 0; left: 0;
       width: 100%; height: 100%;
       background-image: radial-gradient(2px 2px at 20px 30px, #eee, transparent),
                         radial-gradient(2px 2px at 70% 20%, rgba(255,255,255,0.7), transparent),
                         radial-gradient(1px 1px at 50% 80%, #b0c4ff, transparent),
                         radial-gradient(2px 2px at 85% 15%, #ffd7b0, transparent);
-      background-size: 300px 300px;
-      pointer-events: none; z-index: 0; opacity: 0.35;
+      background-size: 300px 300px; pointer-events: none; z-index: 0; opacity: 0.35;
     }
     .main-container {
       width: 100%; max-width: 1100px;
@@ -82,7 +76,7 @@
     .info-item i { font-size: 2.2rem; background: linear-gradient(135deg, #c4d0ff, #7889ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     .info-item h3 { font-size: 1rem; color: #e0e7ff; }
     .info-item p { font-size: 0.8rem; color: #9eaed8; }
-    .capsules-list { display: flex; flex-direction: column; gap: 0.9rem; max-height: 350px; overflow-y: auto; }
+    .capsules-list { display: flex; flex-direction: column; gap: 0.9rem; max-height: 400px; overflow-y: auto; }
     .capsule-item {
       background: rgba(15, 20, 48, 0.55); backdrop-filter: blur(12px);
       border-radius: 2rem; padding: 1rem 1.4rem;
@@ -113,6 +107,13 @@
     }
     .social-icon:hover { background: rgba(255,255,255,0.2); }
     footer { text-align: center; color: #6a7db0; font-size: 0.8rem; opacity: 0.8; margin-top: 1rem; }
+    
+    /* ألوان الحالات */
+    .status-pending { color: #ffd700; }
+    .status-approved { color: #00ff88; }
+    .status-rejected { color: #ff4444; }
+    .status-sent { color: #4da6ff; }
+    
     @media (max-width: 600px) { .glass-card { padding: 1.5rem; } }
   </style>
 </head>
@@ -187,27 +188,6 @@
       <option value="zh-CN">🇨🇳 中文</option>
       <option value="ja">🇯🇵 日本語</option>
       <option value="ko">🇰🇷 한국어</option>
-      <option value="pt">🇵🇹 Português</option>
-      <option value="ru">🇷🇺 Русский</option>
-      <option value="it">🇮🇹 Italiano</option>
-      <option value="tr">🇹🇷 Türkçe</option>
-      <option value="hi">🇮🇳 हिन्दी</option>
-      <option value="ur">🇵🇰 اردو</option>
-      <option value="fa">🇮🇷 فارسی</option>
-      <option value="ms">🇲🇾 Melayu</option>
-      <option value="id">🇮🇩 Indonesia</option>
-      <option value="sw">🇰🇪 Kiswahili</option>
-      <option value="tl">🇵🇭 Tagalog</option>
-      <option value="vi">🇻🇳 Tiếng Việt</option>
-      <option value="th">🇹🇭 ไทย</option>
-      <option value="uk">🇺🇦 Українська</option>
-      <option value="pl">🇵🇱 Polski</option>
-      <option value="nl">🇳🇱 Nederlands</option>
-      <option value="sv">🇸🇪 Svenska</option>
-      <option value="no">🇳🇴 Norsk</option>
-      <option value="da">🇩🇰 Dansk</option>
-      <option value="fi">🇫🇮 Suomi</option>
-      <option value="he">🇮🇱 עברית</option>
     </select>
   </div>
 
@@ -232,135 +212,143 @@
 <script>
   const API_URL = "/api/capsules";
 
-const messageInput = document.getElementById('messageInput');
-const unlockDateInput = document.getElementById('unlockDateInput');
-const emailInput = document.getElementById('emailInput');
-const sealButton = document.getElementById('sealButton');
-const capsulesContainer = document.getElementById('capsulesContainer');
+  const messageInput = document.getElementById('messageInput');
+  const unlockDateInput = document.getElementById('unlockDateInput');
+  const emailInput = document.getElementById('emailInput');
+  const sealButton = document.getElementById('sealButton');
+  const capsulesContainer = document.getElementById('capsulesContainer');
 
-function setDefaultDate() {
-  const now = new Date();
-  now.setDate(now.getDate() + 1);
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
-  const h = String(now.getHours()).padStart(2, '0');
-  const min = String(now.getMinutes()).padStart(2, '0');
-  unlockDateInput.value = `${y}-${m}-${d}T${h}:${min}`;
-}
-setDefaultDate();
-
-sealButton.addEventListener('click', async () => {
-  const message = messageInput.value.trim();
-  const unlockDate = unlockDateInput.value;
-  const email = emailInput.value.trim();
-
-  if (!message || !unlockDate || !email) return alert("املأ جميع الحقول");
-  if (new Date(unlockDate) <= new Date()) return alert("اختر تاريخاً في المستقبل");
-
-  try {
-    const res = await fetch(API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, message, unlockDate: new Date(unlockDate).toISOString() })
-    });
-
-    const data = await res.json();
-    messageInput.value = '';
-    emailInput.value = '';
-    setDefaultDate();
-    loadCapsules();
-    alert("✅ تم إرسال الكبسولة للمراجعة. سيصلك إشعار في تيليجرام.");
-  } catch (err) {
-    alert("❌ خطأ في حفظ الكبسولة");
+  function setDefaultDate() {
+    const now = new Date();
+    now.setDate(now.getDate() + 1);
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    const h = String(now.getHours()).padStart(2, '0');
+    const min = String(now.getMinutes()).padStart(2, '0');
+    unlockDateInput.value = `${y}-${m}-${d}T${h}:${min}`;
   }
-});
+  setDefaultDate();
 
-async function loadCapsules() {
-  try {
-    const res = await fetch(API_URL);
-    const capsules = await res.json();
+  sealButton.addEventListener('click', async () => {
+    const message = messageInput.value.trim();
+    const unlockDate = unlockDateInput.value;
+    const email = emailInput.value.trim();
 
-    if (!capsules || !capsules.length) {
-      capsulesContainer.innerHTML = '<div style="text-align:center;color:#7f8bb3;">✨ لا توجد كبسولات بعد.</div>';
-      return;
+    if (!message || !unlockDate || !email) return alert("املأ جميع الحقول");
+    if (new Date(unlockDate) <= new Date()) return alert("اختر تاريخاً في المستقبل");
+
+    try {
+      const res = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, message, unlockDate: new Date(unlockDate).toISOString() })
+      });
+
+      const data = await res.json();
+      messageInput.value = '';
+      emailInput.value = '';
+      setDefaultDate();
+      loadCapsules();
+      alert("✅ " + data.message);
+    } catch (err) {
+      alert("❌ خطأ في حفظ الكبسولة");
     }
+  });
 
-    capsulesContainer.innerHTML = capsules.map(c => {
-      const now = Date.now();
-      const unlock = new Date(c.unlockDate).getTime();
-      const dist = unlock - now;
+  async function loadCapsules() {
+    try {
+      const res = await fetch(API_URL);
+      const capsules = await res.json();
 
-      let statusText = '';
-      let countdownText = '';
-
-      switch (c.status) {
-        case 'pending':
-          statusText = '🟡 بانتظار القبول';
-          countdownText = '⏳ انتظار';
-          break;
-        case 'approved':
-          statusText = '🟢 تم القبول';
-          if (dist <= 0) {
-            countdownText = '🔓 جاري الإرسال...';
-          } else {
-            const d = Math.floor(dist / 86400000);
-            const h = Math.floor((dist % 86400000) / 3600000);
-            const m = Math.floor((dist % 3600000) / 60000);
-            countdownText = `${d}ي ${h}س ${m}د`;
-          }
-          break;
-        case 'rejected':
-          statusText = '🔴 تم الرفض';
-          countdownText = '🚫 للأسف';
-          break;
-        case 'sent':
-          statusText = '✅ تم الإرسال';
-          countdownText = '📧 أُرسلت';
-          break;
+      if (!capsules || !capsules.length) {
+        capsulesContainer.innerHTML = '<div style="text-align:center;color:#7f8bb3;padding:1.5rem;">✨ لا توجد كبسولات بعد. كن أول من يختم واحدة!</div>';
+        return;
       }
 
-      return `
-        <div class="capsule-item">
-          <div>
-            <small>📧 ${escapeHtml(c.email)}</small><br>
-            <small style="color:#9aa9e0;">🔐 ${new Date(c.unlockDate).toLocaleString('ar-SA')}</small><br>
-            <small>${statusText}</small>
+      capsulesContainer.innerHTML = capsules.map(c => {
+        const now = Date.now();
+        const unlock = new Date(c.unlockDate).getTime();
+        const dist = unlock - now;
+
+        let statusText = '';
+        let statusClass = '';
+        let countdownText = '';
+
+        switch (c.status) {
+          case 'pending':
+            statusText = '🟡 بانتظار القبول من تيليجرام';
+            statusClass = 'status-pending';
+            countdownText = '⏳ انتظار المراجعة';
+            break;
+            
+          case 'approved':
+            statusText = '🟢 لقد تم قبول الرسالة ستصل في موعدها';
+            statusClass = 'status-approved';
+            if (dist <= 0) {
+              countdownText = '📧 جاري الإرسال...';
+            } else {
+              const d = Math.floor(dist / 86400000);
+              const h = Math.floor((dist % 86400000) / 3600000);
+              const m = Math.floor((dist % 3600000) / 60000);
+              countdownText = `⏳ ${d}ي ${h}س ${m}د`;
+            }
+            break;
+            
+          case 'rejected':
+            statusText = '🔴 تم رفض الرسالة للأسف';
+            statusClass = 'status-rejected';
+            countdownText = '🚫 مرفوضة';
+            break;
+            
+          case 'sent':
+            statusText = '✅ تم القبول والإرسال';
+            statusClass = 'status-sent';
+            countdownText = '📬 تم الإرسال بنجاح';
+            break;
+        }
+
+        return `
+          <div class="capsule-item">
+            <div style="flex:1;">
+              <small>📧 ${escapeHtml(c.email)}</small><br>
+              <small style="color:#9aa9e0;">🔐 ${new Date(c.unlockDate).toLocaleString('ar-SA')}</small><br>
+              <small class="${statusClass}" style="font-weight:bold;">${statusText}</small>
+            </div>
+            <div class="countdown">${countdownText}</div>
           </div>
-          <div class="countdown">${countdownText}</div>
-        </div>
-      `;
-    }).join('');
-  } catch (err) {
-    capsulesContainer.innerHTML = '<div style="text-align:center;color:#ff9999;">❌ خطأ في التحميل</div>';
+        `;
+      }).join('');
+    } catch (err) {
+      capsulesContainer.innerHTML = '<div style="text-align:center;color:#ff9999;">❌ خطأ في تحميل الكبسولات</div>';
+    }
   }
-}
 
-function escapeHtml(text) {
-  return String(text).replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
-}
-
-function changeLanguage(lang) {
-  if (!document.getElementById('google_translate_element')) {
-    const div = document.createElement('div');
-    div.id = 'google_translate_element';
-    div.style.display = 'none';
-    document.body.appendChild(div);
+  function escapeHtml(text) {
+    return String(text).replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
   }
-  const script = document.createElement('script');
-  script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateInit';
-  document.body.appendChild(script);
-  window.googleTranslateInit = function() {
-    new google.translate.TranslateElement({
-      pageLanguage: 'ar',
-      includedLanguages: lang,
-      layout: google.translate.TranslateElement.InlineLayout.SIMPLE
-    }, 'google_translate_element');
-  };
-}
 
-loadCapsules();
-setInterval(loadCapsules, 5000);
+  function changeLanguage(lang) {
+    if (!document.getElementById('google_translate_element')) {
+      const div = document.createElement('div');
+      div.id = 'google_translate_element';
+      div.style.display = 'none';
+      document.body.appendChild(div);
+    }
+    const script = document.createElement('script');
+    script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateInit';
+    document.body.appendChild(script);
+    window.googleTranslateInit = function() {
+      new google.translate.TranslateElement({
+        pageLanguage: 'ar',
+        includedLanguages: lang,
+        layout: google.translate.TranslateElement.InlineLayout.SIMPLE
+      }, 'google_translate_element');
+    };
+  }
+
+  loadCapsules();
+  setInterval(loadCapsules, 5000);
 </script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 {
   "name": "time-capsule",
   "version": "1.0.0",
-  "description": "Time Capsule - Send messages to the future",
+  "description": "Time Capsule with Telegram Bot",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

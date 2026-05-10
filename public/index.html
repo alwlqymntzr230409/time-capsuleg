@@ -231,183 +231,98 @@
 
 <script>
   const API_URL = "/api/capsules";
-  
-  // إعدادات EmailJS
-  const EMAILJS_PUBLIC_KEY = "yMWdxIn35VlreN0l_";
-  const EMAILJS_SERVICE_ID = "service_zo9ni5b";
-  const EMAILJS_TEMPLATE_ID = "template_y1f36sr";
 
-  const messageInput = document.getElementById('messageInput');
-  const unlockDateInput = document.getElementById('unlockDateInput');
-  const emailInput = document.getElementById('emailInput');
-  const sealButton = document.getElementById('sealButton');
-  const capsulesContainer = document.getElementById('capsulesContainer');
+const messageInput = document.getElementById('messageInput');
+const unlockDateInput = document.getElementById('unlockDateInput');
+const emailInput = document.getElementById('emailInput');
+const sealButton = document.getElementById('sealButton');
+const capsulesContainer = document.getElementById('capsulesContainer');
 
-  // مجموعة لتتبع الكبسولات التي تم إرسالها بالفعل (حل جذري للتكرار)
-  const sentCapsules = new Set();
+function setDefaultDate() {
+  const now = new Date();
+  now.setDate(now.getDate() + 1);
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  const h = String(now.getHours()).padStart(2, '0');
+  const min = String(now.getMinutes()).padStart(2, '0');
+  unlockDateInput.value = `${y}-${m}-${d}T${h}:${min}`;
+}
+setDefaultDate();
 
-  function setDefaultDate() {
-    const now = new Date();
-    now.setDate(now.getDate() + 1);
-    const y = now.getFullYear();
-    const m = String(now.getMonth() + 1).padStart(2, '0');
-    const d = String(now.getDate()).padStart(2, '0');
-    const h = String(now.getHours()).padStart(2, '0');
-    const min = String(now.getMinutes()).padStart(2, '0');
-    unlockDateInput.value = `${y}-${m}-${d}T${h}:${min}`;
+sealButton.addEventListener('click', async () => {
+  const message = messageInput.value.trim();
+  const unlockDate = unlockDateInput.value;
+  const email = emailInput.value.trim();
+
+  if (!message || !unlockDate || !email) return alert("املأ جميع الحقول");
+  if (new Date(unlockDate) <= new Date()) return alert("اختر تاريخاً في المستقبل");
+
+  try {
+    await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, message, unlockDate: new Date(unlockDate).toISOString() })
+    });
+
+    messageInput.value = '';
+    emailInput.value = '';
+    setDefaultDate();
+    loadCapsules();
+    alert("✅ تم ختم الكبسولة! السيرفر سيرسلها تلقائياً في الموعد.");
+  } catch (err) {
+    alert("❌ خطأ في حفظ الكبسولة");
   }
-  setDefaultDate();
+});
 
-  async function sendEmailDirectly(email, message, capsuleId) {
-    // إذا تم إرسال هذه الكبسولة من قبل، لا ترسلها مرة أخرى
-    if (sentCapsules.has(capsuleId)) {
-      console.log('⏭️ تم إرسال هذه الكبسولة مسبقاً، تخطي...');
-      return true;
+async function loadCapsules() {
+  try {
+    const res = await fetch(API_URL);
+    const capsules = await res.json();
+
+    if (!capsules || !capsules.length) {
+      capsulesContainer.innerHTML = '<div style="text-align:center;color:#7f8bb3;">✨ لا توجد كبسولات بعد.</div>';
+      return;
     }
 
-    try {
-      const response = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          service_id: EMAILJS_SERVICE_ID,
-          template_id: EMAILJS_TEMPLATE_ID,
-          user_id: EMAILJS_PUBLIC_KEY,
-          template_params: {
-            to_email: email,
-            message: message,
-            time: new Date().toLocaleString("ar-SA")
-          }
-        })
-      });
-      
-      if (response.ok) {
-        console.log("✅ تم الإرسال بنجاح إلى:", email);
-        sentCapsules.add(capsuleId); // إضافة الكبسولة إلى قائمة المرسلة
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error("❌ خطأ في الإرسال:", error);
-      return false;
-    }
-  }
+    capsulesContainer.innerHTML = capsules.map(c => {
+      const now = Date.now();
+      const unlock = new Date(c.unlockDate).getTime();
+      const dist = unlock - now;
 
-  sealButton.addEventListener('click', async () => {
-    const message = messageInput.value.trim();
-    const unlockDate = unlockDateInput.value;
-    const email = emailInput.value.trim();
-
-    if (!message || !unlockDate || !email) return alert("املأ جميع الحقول");
-    if (new Date(unlockDate) <= new Date()) return alert("اختر تاريخاً في المستقبل");
-
-    try {
-      await fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: email,
-          message: message,
-          unlockDate: new Date(unlockDate).toISOString()
-        })
-      });
-
-      messageInput.value = '';
-      emailInput.value = '';
-      setDefaultDate();
-      loadCapsules();
-      alert("✅ تم ختم الكبسولة!");
-    } catch (err) {
-      alert("❌ خطأ في حفظ الكبسولة");
-    }
-  });
-
-  async function loadCapsules() {
-    try {
-      const res = await fetch(API_URL);
-      const capsules = await res.json();
-
-      if (!capsules || !capsules.length) {
-        capsulesContainer.innerHTML = '<div style="text-align:center;color:#7f8bb3;">✨ لا توجد كبسولات بعد.</div>';
-        return;
+      let countdownText = '';
+      if (c.status === 'sent') {
+        countdownText = '✅ أُرسلت';
+      } else if (dist <= 0) {
+        countdownText = '🔓 جاري الإرسال...';
+      } else {
+        const d = Math.floor(dist / 86400000);
+        const h = Math.floor((dist % 86400000) / 3600000);
+        const m = Math.floor((dist % 3600000) / 60000);
+        countdownText = `${d}ي ${h}س ${m}د`;
       }
 
-      capsulesContainer.innerHTML = '';
-      
-      for (const c of capsules) {
-        const now = new Date().getTime();
-        const unlock = new Date(c.unlockDate).getTime();
-        const dist = unlock - now;
-
-        let countdownText = '';
-        let shouldSend = false;
-
-        // إنشاء معرف فريد للكبسولة
-        const capsuleId = `${c.email}-${c.unlockDate}`;
-
-        if (c.status === 'sent' || sentCapsules.has(capsuleId)) {
-          countdownText = '✅ أُرسلت';
-        } else if (dist <= 0) {
-          countdownText = '🚀 جاري الإرسال...';
-          shouldSend = true;
-        } else {
-          const d = Math.floor(dist / (1000*60*60*24));
-          const h = Math.floor((dist % (1000*60*60*24)) / (1000*60*60));
-          const m = Math.floor((dist % (1000*60*60)) / (1000*60));
-          countdownText = `${d}ي ${h}س ${m}د`;
-        }
-
-        const capsuleDiv = document.createElement('div');
-        capsuleDiv.className = 'capsule-item';
-        capsuleDiv.innerHTML = `
+      return `
+        <div class="capsule-item">
           <div>
             <small>📧 ${escapeHtml(c.email)}</small><br>
             <small style="color:#9aa9e0;">🔐 ${new Date(c.unlockDate).toLocaleString('ar-SA')}</small>
           </div>
           <div class="countdown">${countdownText}</div>
-        `;
-        capsulesContainer.appendChild(capsuleDiv);
-
-        if (shouldSend) {
-          const sent = await sendEmailDirectly(c.email, c.message, capsuleId);
-          if (sent) {
-            // تحديث العرض فوراً
-            const countdownEl = capsuleDiv.querySelector('.countdown');
-            if (countdownEl) countdownEl.textContent = '✅ أُرسلت';
-          }
-        }
-      }
-
-    } catch (err) {
-      capsulesContainer.innerHTML = '<div style="text-align:center;color:#ff9999;">❌ خطأ في التحميل</div>';
-    }
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    capsulesContainer.innerHTML = '<div style="text-align:center;color:#ff9999;">❌ خطأ في التحميل</div>';
   }
+}
 
-  function escapeHtml(text) {
-    return String(text).replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
-  }
+function escapeHtml(text) {
+  return String(text).replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+}
 
-  function changeLanguage(lang) {
-    if (!document.getElementById('google_translate_element')) {
-      const div = document.createElement('div');
-      div.id = 'google_translate_element';
-      div.style.display = 'none';
-      document.body.appendChild(div);
-    }
-    const script = document.createElement('script');
-    script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateInit';
-    document.body.appendChild(script);
-    window.googleTranslateInit = function() {
-      new google.translate.TranslateElement({
-        pageLanguage: 'ar',
-        includedLanguages: lang,
-        layout: google.translate.TranslateElement.InlineLayout.SIMPLE
-      }, 'google_translate_element');
-    };
-  }
-
-  loadCapsules();
-  setInterval(loadCapsules, 10000);
+loadCapsules();
+setInterval(loadCapsules, 5000);
 </script>
 </body>
 </html>
